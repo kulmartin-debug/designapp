@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+@theme {
+  /* Warm, editorial palette for an interior-design brand. */
+  --color-paper: #faf7f2;
+  --color-paper-dark: #f1ebe1;
+  --color-card: #fffdfb;
+  --color-line: #e7ded0;
+  --color-ink: #2b2620;
+  --color-ink-soft: #6b6255;
+
+  --color-brand-50: #f7ede7;
+  --color-brand-100: #efd9cb;
+  --color-brand-300: #d99a71;
+  --color-brand-500: #b5573c;
+  --color-brand-600: #9c4630;
+  --color-brand-700: #7c3625;
+
+  --font-serif: Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Times New Roman', serif;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+}
+
+::selection {
+  background: var(--color-brand-100);
+  color: var(--color-brand-700);
+}
+
+/* Warm, moodboard-style hero background (no external images) - a soft
+   diagonal gradient plus a faint grain texture for an editorial feel. */
+.hero-surface {
+  background-image:
+    radial-gradient(circle at 15% 20%, rgba(255, 255, 255, 0.10), transparent 45%),
+    linear-gradient(135deg, #5b4a3a 0%, #8a5a3d 32%, #b5573c 58%, #7c3625 100%);
+  position: relative;
+}
+
+.hero-surface::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.5;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  pointer-events: none;
+}

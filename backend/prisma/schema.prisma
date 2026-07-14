@@ -1,0 +1,155 @@
+// Prisma schema for the "Pred/Po" interior visualization app.
+// Dev DB is SQLite; switching to Postgres in production only requires
+// changing `provider` + `DATABASE_URL` below (see README).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum AssetCategory {
+  FOTO_SUCASNY_STAV
+  PODORYS
+  NAVRH_SKETCHUP
+  DERIVED_DEPTH_MAP
+  DERIVED_CANNY_EDGE
+  GENERATED_OUTPUT
+  EXPORT_COMPARISON
+}
+
+enum JobModule {
+  CURRENT_STATE_ENHANCE
+  SKETCH_RENDER
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  DONE
+  FAILED
+  CANCELLED
+}
+
+enum ProviderCheckStatus {
+  OK
+  FAILED
+}
+
+enum ProviderName {
+  REPLICATE
+  FAL
+  GEMINI
+  MOCK
+}
+
+model Project {
+  id          String             @id @default(cuid())
+  name        String
+  note        String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  assets      Asset[]
+  jobs        GenerationJob[]
+  comparisons ComparisonExport[]
+}
+
+model Asset {
+  id               String        @id @default(cuid())
+  projectId        String
+  project          Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  category         AssetCategory
+  storageKey       String
+  originalFilename String?
+  mimeType         String
+  sizeBytes        Int
+  width            Int?
+  height           Int?
+  createdAt        DateTime      @default(now())
+
+  jobsAsInput        GenerationJob[]     @relation("JobInputAsset")
+  jobsAsDepthMap     GenerationJob[]     @relation("JobDepthAsset")
+  jobsAsCannyMap     GenerationJob[]     @relation("JobCannyAsset")
+  variants           GenerationVariant[]
+  comparisonsBefore  ComparisonExport[]  @relation("ComparisonBefore")
+  comparisonsAfter   ComparisonExport[]  @relation("ComparisonAfter")
+  comparisonsResult  ComparisonExport[]  @relation("ComparisonResult")
+
+  @@index([projectId, category])
+}
+
+model GenerationJob {
+  id                   String       @id @default(cuid())
+  projectId            String
+  project              Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  module               JobModule
+  status               JobStatus    @default(PENDING)
+  provider             ProviderName
+  providerModel        String?
+  inputAssetId         String
+  inputAsset           Asset        @relation("JobInputAsset", fields: [inputAssetId], references: [id])
+  styleDescription     String?
+  resolvedPrompt       String
+  numVariantsRequested Int          @default(1)
+  depthMapAssetId      String?
+  depthMapAsset        Asset?       @relation("JobDepthAsset", fields: [depthMapAssetId], references: [id])
+  cannyMapAssetId      String?
+  cannyMapAsset        Asset?       @relation("JobCannyAsset", fields: [cannyMapAssetId], references: [id])
+  estimatedCostUsd     Float
+  actualCostUsd        Float?
+  errorCode            String?
+  errorMessage         String?
+  retryCount           Int          @default(0)
+  startedAt            DateTime?
+  finishedAt           DateTime?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  variants GenerationVariant[]
+
+  @@index([projectId, status])
+}
+
+model GenerationVariant {
+  id           String        @id @default(cuid())
+  jobId        String
+  job          GenerationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  variantIndex Int
+  assetId      String
+  asset        Asset         @relation(fields: [assetId], references: [id])
+  isSelected   Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+
+  @@unique([jobId, variantIndex])
+}
+
+model ComparisonExport {
+  id            String   @id @default(cuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  beforeAssetId String
+  beforeAsset   Asset    @relation("ComparisonBefore", fields: [beforeAssetId], references: [id])
+  afterAssetId  String
+  afterAsset    Asset    @relation("ComparisonAfter", fields: [afterAssetId], references: [id])
+  resultAssetId String
+  resultAsset   Asset    @relation("ComparisonResult", fields: [resultAssetId], references: [id])
+  beforeLabel   String   @default("PRED")
+  afterLabel    String   @default("PO")
+  createdAt     DateTime @default(now())
+}
+
+// API key per provider, editable at runtime from the Settings page (not just
+// .env). A missing row falls back to the matching env var at boot, so local
+// dev keeps working via .env with no DB setup required.
+model ProviderCredential {
+  id            String               @id @default(cuid())
+  provider      ProviderName         @unique
+  apiKey        String?
+  lastStatus    ProviderCheckStatus?
+  lastCheckedAt DateTime?
+  lastError     String?
+  updatedAt     DateTime             @updatedAt
+}
