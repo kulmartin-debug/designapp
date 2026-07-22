@@ -1,0 +1,40 @@
+# Render Blueprint - https://render.com/docs/blueprint-spec
+# In Render: New -> Blueprint -> select this repo. Render reads this file and
+# creates the service below; you only need to fill in the `sync: false`
+# values (Supabase connection details) in the dashboard afterwards.
+services:
+  - type: web
+    name: designapp
+    runtime: node
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: STORAGE_DRIVER
+        value: s3
+      - key: S3_REGION
+        value: us-east-1
+      - key: DEFAULT_PROVIDER
+        value: MOCK
+      # Fill in after creating the Supabase project (Project Settings -> Database):
+      - key: DATABASE_URL
+        sync: false
+      # Fill in after Supabase Storage -> Settings -> S3 Connection:
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      # Choose your own login password for the app:
+      - key: ACCESS_PASSWORD
+        sync: false
+      # Render generates and stores these automatically (stable across redeploys):
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: CREDENTIALS_ENCRYPTION_KEY
+        generateValue: true

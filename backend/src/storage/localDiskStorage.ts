@@ -22,7 +22,7 @@ class LocalDiskStorage implements FileStorage {
     await rm(this.getAbsolutePath(storageKey), { force: true });
   }
 
-  getAbsolutePath(storageKey: string): string {
+  private getAbsolutePath(storageKey: string): string {
     return path.join(uploadsRoot, storageKey);
   }
 }

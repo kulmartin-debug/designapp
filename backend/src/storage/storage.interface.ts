@@ -3,11 +3,11 @@ export interface StoredFileHandle {
 }
 
 // Abstraction over "where uploaded/generated files live". `localDiskStorage`
-// implements this for dev; an S3-compatible implementation can be dropped in
-// for production without touching callers (asset.service.ts, comparison.service.ts, ...).
+// implements this for dev; `s3Storage` (Supabase Storage / any S3-compatible
+// bucket) implements it for production - callers (asset.service.ts,
+// comparison.service.ts, ...) never know or care which one is active.
 export interface FileStorage {
   save(buffer: Buffer, opts: { extension: string }): Promise<StoredFileHandle>;
   read(storageKey: string): Promise<Buffer>;
   delete(storageKey: string): Promise<void>;
-  getAbsolutePath(storageKey: string): string;
 }

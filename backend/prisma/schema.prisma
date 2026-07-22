@@ -1,13 +1,12 @@
 // Prisma schema for the "Pred/Po" interior visualization app.
-// Dev DB is SQLite; switching to Postgres in production only requires
-// changing `provider` + `DATABASE_URL` below (see README).
+// PostgreSQL (e.g. a free Supabase project) - see README for setup.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 

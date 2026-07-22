@@ -1,6 +1,7 @@
 import type { ProviderCheckStatus, ProviderName } from '@prisma/client';
 import { prisma } from '../prisma.js';
 import { env } from '../config/env.js';
+import { decrypt, encrypt } from './encryption.js';
 
 // Bootstrap fallback so local dev keeps working via .env with zero DB setup.
 // Once a key is saved through the Settings page, the DB row takes precedence.
@@ -19,7 +20,16 @@ async function loadCache(): Promise<Map<ProviderName, string>> {
   const rows = await prisma.providerCredential.findMany();
   cache = new Map();
   for (const row of rows) {
-    if (row.apiKey) cache.set(row.provider, row.apiKey);
+    if (!row.apiKey) continue;
+    try {
+      cache.set(row.provider, decrypt(row.apiKey));
+    } catch {
+      // CREDENTIALS_ENCRYPTION_KEY changed (e.g. wasn't set explicitly and a
+      // fresh random one was generated this boot) - the stored value can no
+      // longer be decrypted. Degrade to "no key" (-> MOCK fallback) instead
+      // of crashing; the user re-enters it via /nastavenia.
+      console.warn(`Nepodarilo sa dešifrovať uložený API kľúč pre ${row.provider} - bude potrebné zadať znova.`);
+    }
   }
   return cache;
 }
@@ -38,8 +48,8 @@ export async function hasApiKey(provider: ProviderName): Promise<boolean> {
 export async function setApiKey(provider: ProviderName, apiKey: string): Promise<void> {
   await prisma.providerCredential.upsert({
     where: { provider },
-    update: { apiKey, lastStatus: null, lastCheckedAt: null, lastError: null },
-    create: { provider, apiKey },
+    update: { apiKey: encrypt(apiKey), lastStatus: null, lastCheckedAt: null, lastError: null },
+    create: { provider, apiKey: encrypt(apiKey) },
   });
   (await loadCache()).set(provider, apiKey);
 }

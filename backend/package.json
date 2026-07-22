@@ -13,10 +13,11 @@
     "postinstall": "prisma generate",
     "seed": "tsx prisma/seed.ts",
     "test": "vitest run tests/unit",
-    "pretest:e2e": "cross-env DATABASE_URL=file:./tests/test.db npx prisma migrate deploy",
-    "test:e2e": "cross-env DATABASE_URL=file:./tests/test.db vitest run tests/e2e"
+    "pretest:e2e": "node scripts/run-with-test-db.mjs npx prisma migrate deploy",
+    "test:e2e": "node scripts/run-with-test-db.mjs npx vitest run tests/e2e"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1086.0",
     "@prisma/client": "^6.16.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",

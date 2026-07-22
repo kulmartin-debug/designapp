@@ -19,29 +19,39 @@ flowchart LR
         API[REST API\nrouty/controllery]
         JobRunner[jobRunner.service\npoll loop, in-process]
         Providers[providerRegistry\nreplicate / fal / gemini / mock]
-        Storage[storage abstrakcia\nlocalDisk -> S3 pripravené]
+        Storage[storage abstrakcia\nlocalDisk alebo S3/Supabase]
         Sharp[comparison.service\nsharp compositing]
+        Crypto[encryption.ts\nAES-256-GCM pre API kľúče]
     end
 
-    DB[(SQLite / Postgres\ncez Prisma)]
-    Disk[(backend/uploads\nlokálny disk)]
+    DB[(PostgreSQL\ncez Prisma - napr. Supabase)]
+    Bucket[(S3-kompatibilné úložisko\nnapr. Supabase Storage)]
     ExtAPI[[Replicate / fal.ai / Gemini]]
 
     UI -->|REST /api/*| API
     Poll -->|GET /api/jobs/:id| API
     API --> DB
-    API --> Storage --> Disk
+    API --> Storage --> Bucket
     API --> JobRunner
     JobRunner --> Providers --> ExtAPI
     JobRunner --> DB
     API --> Sharp --> Storage
+    Providers --> Crypto --> DB
 ```
 
 **Prečo Node/Express/Prisma namiesto Python/FastAPI:** ControlNet depth/canny
 preprocessing sa dá riešiť cez hostované modely na Replicate/fal.ai (žiadna
 potreba lokálneho `controlnet-aux`), takže výhoda Pythonu tu odpadá. Node dáva
 jeden jazyk pre celý monorepo, `sharp` (libvips) je rýchlejší ako Pillow pre
-skladanie PRED/PO obrázkov, a Prisma umožňuje jednoduchý prechod SQLite → Postgres.
+skladanie PRED/PO obrázkov.
+
+**Prečo PostgreSQL (napr. Supabase) + S3-kompatibilné úložisko namiesto SQLite
+a lokálneho disku:** bezplatné úrovne moderných hostingov appiek (Render, aj
+Railway) nedávajú trvalý disk zadarmo - databáza aj nahraté súbory preto musia
+žiť mimo appky, v spravovaných službách s vlastnou trvalosťou. Appka je na to
+navrhnutá cez výmennú `storage` abstrakciu (`localDiskStorage` pre rýchly
+lokálny vývoj bez účtov, `s3Storage` pre Supabase Storage/akékoľvek
+S3-kompatibilné úložisko v produkcii) - stačí prepnúť `STORAGE_DRIVER`.
 
 **Asynchrónne generovanie bez frontovacej infraštruktúry (Redis/BullMQ):**
 `jobRunner.service.ts` beží ako in-process `setInterval` poll loop (max 2
@@ -52,39 +62,47 @@ inštancií backendu.
 
 ## Inštalácia
 
-Predpoklady: Node.js 20+ (testované na v24), npm.
+Predpoklady: Node.js 20+ (testované na v24), npm, a **PostgreSQL databáza**
+(najjednoduchšie: bezplatný projekt na [supabase.com](https://supabase.com) -
+Project Settings → Database → Connection string).
 
 ```bash
 # 1. Skopírujte .env.example
 cp .env.example backend/.env
 cp .env.example frontend/.env   # frontend číta len VITE_API_BASE_URL
 
-# 2. Backend
+# 2. V backend/.env doplňte DATABASE_URL (connection string zo Supabase)
+
+# 3. Backend
 cd backend
 npm install
-npx prisma migrate dev --name init   # vytvorí SQLite DB + tabuľky
-npm run seed                         # voliteľné: 1 demo projekt s placeholder obrázkami
-npm run dev                          # beží na http://localhost:4000
+npx prisma migrate deploy   # vytvorí tabuľky v Postgres DB
+npm run seed                # voliteľné: 1 demo projekt s placeholder obrázkami
+npm run dev                 # beží na http://localhost:4000
 
-# 3. Frontend (v novom termináli)
+# 4. Frontend (v novom termináli)
 cd frontend
 npm install
-npm run dev                          # beží na http://localhost:5173
+npm run dev                 # beží na http://localhost:5173
 ```
 
-Appka je plne funkčná bez akýchkoľvek API kľúčov — každý provider, ktorého
+Appka je plne funkčná bez akýchkoľvek AI API kľúčov — každý provider, ktorého
 kľúč chýba, automaticky prepne na `MOCK` režim (vráti placeholder obrázok,
 cena $0). API kľúče sa dajú zadať aj priamo v appke na stránke **/nastavenia**
-(uložia sa do DB, majú prednosť pred `.env`) — po uložení sa kľúč hneď overí a
-zobrazí sa farebný stav: zelená = funguje, červená = neaktívne/chýba,
-oranžová = práve sa overuje.
+(uložia sa zašifrované do DB, majú prednosť pred `.env`) — po uložení sa kľúč
+hneď overí a zobrazí sa farebný stav: zelená = funguje, červená =
+neaktívne/chýba, oranžová = práve sa overuje.
+
+Pre nahrávanie súborov môžete lokálne ostať pri `STORAGE_DRIVER=local`
+(ukladá na disk do `backend/uploads`, netreba žiadny účet) - na `s3`
+(Supabase Storage) treba prepnúť až pri nasadení bez trvalého disku (viď nižšie).
 
 ### Testy
 
 ```bash
 cd backend
-npm test          # unit testy adaptérovej vrstvy (mocknuté, bez DB)
-npm run test:e2e  # e2e happy-path (vlastná SQLite test DB, migruje sa automaticky)
+npm test          # unit testy adaptérovej vrstvy + šifrovania (mocknuté, bez DB)
+npm run test:e2e  # e2e happy-path (vlastná Postgres test DB, migruje sa automaticky - nastavte TEST_DATABASE_URL)
 ```
 
 ## `.env` premenné
@@ -93,18 +111,21 @@ Viď [`.env.example`](.env.example) v koreni repozitára (skopírujte do `backen
 
 | Premenná | Popis |
 |---|---|
-| `PORT` | Port backendu (predvolené 4000) |
-| `DATABASE_URL` | Prisma connection string (`file:./dev.db` pre SQLite dev) |
-| `STORAGE_DRIVER` | `local` (disk, dev) alebo `s3` (zatiaľ neimplementované, pripravené rozhranie) |
-| `UPLOADS_DIR` | Priečinok pre lokálne súbory |
+| `PORT` | Port backendu (predvolené 4000; Render/hosting si ho zvyčajne nastaví sám) |
+| `DATABASE_URL` | PostgreSQL connection string (napr. zo Supabase: Project Settings → Database) |
+| `STORAGE_DRIVER` | `local` (disk, rýchly vývoj) alebo `s3` (S3-kompatibilné úložisko, napr. Supabase Storage - potrebné vždy, keď appka nemá trvalý disk) |
+| `UPLOADS_DIR` | Priečinok pre lokálne súbory (len keď `STORAGE_DRIVER=local`) |
+| `S3_ENDPOINT` / `S3_REGION` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` / `S3_BUCKET` | Potrebné len keď `STORAGE_DRIVER=s3` (Supabase: Storage → Settings → S3 Connection) |
 | `REPLICATE_API_TOKEN` | API token z replicate.com/account/api-tokens |
 | `FAL_API_KEY` | API kľúč z fal.ai/dashboard/keys |
 | `GEMINI_API_KEY` | API kľúč z aistudio.google.com/apikey |
 | `DEFAULT_PROVIDER` | Provider použitý, keď klient v requeste neuvedie `provider` (predvolené `MOCK`) |
 | `ACCESS_PASSWORD` | Jednotné heslo pre celú appku. Prázdne = appka je bez hesla (len pre lokálny vývoj!) |
 | `SESSION_SECRET` | Podpisuje prihlasovaciu cookie. V produkcii nastavte na dlhý náhodný reťazec, inak sa všetci odhlásia pri každom reštarte |
+| `CREDENTIALS_ENCRYPTION_KEY` | Šifruje uložené AI API kľúče v DB (AES-256-GCM). V produkcii nastavte a nemeňte, inak sa uložené kľúče po reštarte nedešifrujú |
 | `FRONTEND_ORIGIN` | Len ak frontend/backend bežia na rôznych origin (dva dev servery); pri same-origin produkčnom builde sa nepoužíva |
 | `VITE_API_BASE_URL` | (frontend, `.env`) URL backendu pre lokálny vývoj. V `.env.production` je zámerne prázdne (relatívne API volania na rovnaký origin) |
+| `TEST_DATABASE_URL` | Samostatná Postgres DB pre `npm run test:e2e` (nepoužívajte tú istú ako dev/produkcia) |
 
 ## Ako pridať/aktualizovať AI providera
 
@@ -134,28 +155,55 @@ Existujúce adaptéry (`replicate.provider.ts`, `fal.provider.ts`) majú model
 ID/verzie označené ako placeholdery — pred nasadením ich treba nahradiť
 reálnymi hodnotami z dokumentácie providera a otestovať s ostrým API kľúčom.
 
-## Nasadenie do produkcie (Railway)
+## Nasadenie do produkcie (Render + Supabase, $0 natrvalo)
 
-Appka je navrhnutá tak, aby bežala ako **jedna Railway služba** — Express
-backend v produkcii servíruje aj zostavený frontend (`npm run build` skopíruje
-`frontend/dist` do `backend/public`, viď [`staticFrontend.ts`](backend/src/staticFrontend.ts)
-a [`scripts/copy-frontend-dist.mjs`](scripts/copy-frontend-dist.mjs)). Vďaka
-tomu bežia frontend aj API na rovnakej doméne — žiadne cross-origin
-komplikácie s prihlasovacou cookie.
+Appka je navrhnutá tak, aby bežala ako **jedna Render web služba bez trvalého
+disku** — databáza aj nahraté súbory žijú v Supabase (free, bez karty), a
+Express backend v produkcii servíruje aj zostavený frontend (`npm run build`
+skopíruje `frontend/dist` do `backend/public`, viď
+[`staticFrontend.ts`](backend/src/staticFrontend.ts) a
+[`scripts/copy-frontend-dist.mjs`](scripts/copy-frontend-dist.mjs)) — frontend
+aj API tak bežia na rovnakej doméne, žiadne cross-origin komplikácie s
+prihlasovacou cookie.
 
-1. **Push na GitHub** — repo musí byť na GitHube, aby sa dalo pripojiť k Railway (viď nižšie).
-2. Na [railway.app](https://railway.app) vytvorte nový projekt → **Deploy from GitHub repo** → vyberte tento repozitár.
-3. Railway z koreňového [`package.json`](package.json) automaticky zistí a spustí:
-   - build: `npm run build` (zostaví frontend, skopíruje ho do `backend/public`, zostaví backend)
-   - štart: `npm start` (spustí `prisma migrate deploy` a potom server)
-4. Pridajte **Volume** (trvalý disk) pripojený napr. na `/app/backend` — SQLite databáza (`dev.db`) aj nahraté súbory (`backend/uploads`) musia prežiť redeploy.
-5. V Railway nastavte premenné prostredia (Settings → Variables) — minimálne:
-   - `DATABASE_URL=file:./dev.db` (alebo pripojte Railway Postgres a zmeňte `provider` v `prisma/schema.prisma` na `postgresql`)
-   - `NODE_ENV=production`
-   - `ACCESS_PASSWORD=` (zvoľte si heslo)
-   - `SESSION_SECRET=` (dlhý náhodný reťazec, napr. `openssl rand -hex 32`)
-   - API kľúče (`REPLICATE_API_TOKEN`, `FAL_API_KEY`, `GEMINI_API_KEY`) sú voliteľné — dajú sa doplniť neskôr priamo cez `/nastavenia` v appke.
-6. Railway pridelí appke verejnú URL (`https://....up.railway.app`) — appka je online.
+**Kompromis zadarmo:** Render free web service po ~15 min nečinnosti "zaspí" -
+prvé ďalšie otvorenie trvá cca 30-60 sekúnd, kým sa appka prebudí.
+
+### 1. Supabase (databáza + úložisko)
+
+1. Vytvorte si projekt na [supabase.com](https://supabase.com) (bez karty).
+2. **Databáza:** Project Settings → Database → skopírujte *Connection string*
+   (zvoľte "Transaction" pooler mode) → to bude `DATABASE_URL`.
+3. **Úložisko:** Storage → vytvorte nový bucket (napr. `assets`, súkromný -
+   appka doň pristupuje len cez vlastný backend, netreba public prístup) →
+   Storage → Settings → **S3 Connection** → skopírujte `S3_ENDPOINT`,
+   `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`.
+
+### 2. Render
+
+1. Push na GitHub (repo musí byť na GitHube).
+2. Na [render.com](https://render.com) → **New** → **Blueprint** → vyberte
+   tento repozitár. Render prečíta [`render.yaml`](render.yaml) a vytvorí
+   službu automaticky.
+3. Doplňte premenné, ktoré `render.yaml` označuje ako `sync: false` (Render
+   vás na to sám vyzve pri vytváraní): `DATABASE_URL`, `S3_ENDPOINT`,
+   `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_BUCKET`, `ACCESS_PASSWORD`
+   (zvoľte si vlastné heslo). `SESSION_SECRET` a `CREDENTIALS_ENCRYPTION_KEY`
+   si Render vygeneruje sám a udrží stabilné naprieč redeploymi.
+4. Render appku zostaví (`npm run build`) a spustí (`npm start`, ktorý najprv
+   pustí `prisma migrate deploy`). Po dokončení dostanete verejnú URL
+   (`https://designapp.onrender.com`) — appka je online, zadarmo.
+5. AI API kľúče (Replicate/fal/Gemini) netreba nastavovať teraz — doplníte ich
+   kedykoľvek priamo v appke cez `/nastavenia`.
+
+### Alternatíva: platený hosting s trvalým diskom (Railway)
+
+Ak by ste namiesto Supabase/S3 chceli jednoduchší setup s lokálnym diskom
+(`STORAGE_DRIVER=local`, `DATABASE_URL` na lokálny SQLite súbor by ale
+vyžadovalo vrátiť `datasource provider` v `prisma/schema.prisma` späť na
+`sqlite`), Railway.app ponúka pripojenie trvalého disku (Volume), ale len na
+plánoch od $5/mesiac (Hobby) — Railway zrušil trvalo bezplatnú úroveň, dáva
+len $5/30 dní skúšobný kredit.
 
 ## Známe limity MVP
 
@@ -174,10 +222,15 @@ komplikácie s prihlasovacou cookie.
   fakturačné API providerov a časom sa môže rozchádzať od skutočných nákladov.
 - Job runner beží in-process (žiadny Redis/queue) — vhodné pre jednu inštanciu
   backendu; horizontálne škálovanie by vyžadovalo prechod na skutočnú frontu.
-- Mazanie projektu/assetu maže DB záznamy okamžite, súbory na disku sa mažú
+- Mazanie projektu/assetu maže DB záznamy okamžite, súbory v úložisku sa mažú
   best-effort — občasný "orphaned files" sweep nie je súčasťou MVP.
-- Úložisko do S3 (`storage/s3Storage.ts`) je len pripravené rozhranie, nie je
-  implementované — pre produkciu treba doplniť AWS SDK volania.
+- Render free tier appku po ~15 min nečinnosti uspí — prvé ďalšie otvorenie
+  trvá cca 30-60 sekúnd. Supabase free projekt sa po 7 dňoch bez požiadaviek
+  tiež pozastaví (treba ho ručne "zobudiť" v Supabase dashboarde).
+- `CREDENTIALS_ENCRYPTION_KEY`/`SESSION_SECRET` musia byť v produkcii nastavené
+  explicitne a nemenné — inak sa pri každom reštarte/redeploy stratí možnosť
+  dešifrovať uložené API kľúče (treba ich zadať znova) resp. odhlásia sa
+  všetci používatelia.
 
 ## Ďalšie kroky (mimo MVP)
 

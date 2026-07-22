@@ -7,14 +7,8 @@ build/
 .env.local
 
 # backend
-backend/dev.db
-backend/dev.db-journal
 backend/uploads/*
 !backend/uploads/.gitkeep
-backend/prisma/dev.db
-backend/prisma/dev.db-journal
-backend/tests/test.db
-backend/tests/test.db-journal
 
 # frontend
 frontend/dist/
@@ -25,4 +19,3 @@ backend/public/
 # misc
 .DS_Store
 *.log
-backend/prisma/tests/
