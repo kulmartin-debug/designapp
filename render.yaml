@@ -12,10 +12,15 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # Without this, npm skips devDependencies during install (because
+      # NODE_ENV=production is also visible to npm), and the build fails -
+      # vite/typescript/@types/node are devDependencies needed only to build.
+      - key: NPM_CONFIG_PRODUCTION
+        value: 'false'
       - key: STORAGE_DRIVER
         value: s3
       - key: S3_REGION
-        value: us-east-1
+        value: eu-west-1
       - key: DEFAULT_PROVIDER
         value: MOCK
       # Fill in after creating the Supabase project (Project Settings -> Database):
