@@ -11,6 +11,14 @@ const PROVIDER_LABELS: Record<ProviderName, string> = {
   MOCK: 'Mock',
 };
 
+const PROVIDER_DESCRIPTIONS: Partial<Record<ProviderName, string>> = {
+  REPLICATE:
+    'Používa sa pre Modul B (vylepšenie fotky súčasného stavu) aj Modul C (fotorealistický render zo SketchUp náčrtu so zachovaním geometrie). Kľúč získate na replicate.com/account/api-tokens.',
+  FAL: 'Alternatíva k Replicate — rovnaké možnosti (Modul B aj Modul C), iný poskytovateľ AI modelov. Kľúč získate na fal.ai/dashboard/keys.',
+  GEMINI:
+    'Používa sa len pre Modul B (vyčistenie a zjednotenie fotky súčasného stavu) — nepodporuje Modul C (návrh zo SketchUp náčrtu). Kľúč získate na aistudio.google.com/apikey.',
+};
+
 function statusColor(summary: ProviderCredentialSummary, isBusy: boolean): DotColor {
   if (isBusy) return 'orange';
   if (!summary.hasKey) return 'red';
@@ -80,6 +88,10 @@ export function ProviderCredentialRow({
         <h3 className="font-serif text-lg text-ink">{PROVIDER_LABELS[summary.provider]}</h3>
         <StatusDot color={statusColor(summary, isBusy)} />
       </div>
+
+      {PROVIDER_DESCRIPTIONS[summary.provider] && (
+        <p className="text-sm text-ink-soft">{PROVIDER_DESCRIPTIONS[summary.provider]}</p>
+      )}
 
       {summary.hasKey && (
         <p className="text-xs text-ink-soft">
