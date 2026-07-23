@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { AssetCategory, ProjectDetail } from '../types/api';
 import { getProject } from '../api/projects';
 import { UploadDropzone } from '../components/upload/UploadDropzone';
 import { AssetGallery } from '../components/upload/AssetGallery';
 import { CostBadge } from '../components/common/CostBadge';
+import { DeleteProjectButton } from '../components/common/DeleteProjectButton';
 import { CurrentStateEnhancePanel } from '../components/moduleB/CurrentStateEnhancePanel';
 import { SketchRenderPanel } from '../components/moduleC/SketchRenderPanel';
 import { ComparisonSection } from '../components/moduleD/ComparisonSection';
@@ -18,6 +19,7 @@ const UPLOAD_SECTIONS: { category: AssetCategory; multiple: boolean }[] = [
 
 export function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [project, setProject] = useState<ProjectDetail | null>(null);
 
   const refresh = useCallback(async () => {
@@ -47,7 +49,10 @@ export function ProjectDetailPage() {
             <h1 className="font-serif text-3xl text-ink">{project.name}</h1>
             {project.note && <p className="mt-1 text-sm text-ink-soft">{project.note}</p>}
           </div>
-          <CostBadge totalCostUsd={project.totalCostUsd} />
+          <div className="flex items-center gap-2">
+            <CostBadge totalCostUsd={project.totalCostUsd} />
+            <DeleteProjectButton projectId={project.id} projectName={project.name} onDeleted={() => navigate('/')} />
+          </div>
         </div>
       </div>
 

@@ -4,6 +4,7 @@ import type { Project } from '../types/api';
 import { createProject, listProjects } from '../api/projects';
 import { sk } from '../i18n/sk';
 import { CostBadge } from '../components/common/CostBadge';
+import { DeleteProjectButton } from '../components/common/DeleteProjectButton';
 
 export function ProjectListPage() {
   const [projects, setProjects] = useState<Project[] | null>(null);
@@ -79,12 +80,15 @@ export function ProjectListPage() {
             to={`/projects/${project.id}`}
             className="block rounded-lg border border-line bg-card p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-md"
           >
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="font-serif text-lg text-ink">{project.name}</h2>
                 {project.note && <p className="text-sm text-ink-soft">{project.note}</p>}
               </div>
-              <CostBadge totalCostUsd={project.totalCostUsd} />
+              <div className="flex items-center gap-2">
+                <CostBadge totalCostUsd={project.totalCostUsd} />
+                <DeleteProjectButton projectId={project.id} projectName={project.name} onDeleted={refresh} />
+              </div>
             </div>
           </Link>
         ))}
