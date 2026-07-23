@@ -89,7 +89,7 @@ model GenerationJob {
   provider             ProviderName
   providerModel        String?
   inputAssetId         String
-  inputAsset           Asset        @relation("JobInputAsset", fields: [inputAssetId], references: [id])
+  inputAsset           Asset        @relation("JobInputAsset", fields: [inputAssetId], references: [id], onDelete: Cascade)
   styleDescription     String?
   resolvedPrompt       String
   numVariantsRequested Int          @default(1)
@@ -118,7 +118,7 @@ model GenerationVariant {
   job          GenerationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
   variantIndex Int
   assetId      String
-  asset        Asset         @relation(fields: [assetId], references: [id])
+  asset        Asset         @relation(fields: [assetId], references: [id], onDelete: Cascade)
   isSelected   Boolean       @default(false)
   createdAt    DateTime      @default(now())
 
@@ -130,11 +130,11 @@ model ComparisonExport {
   projectId     String
   project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   beforeAssetId String
-  beforeAsset   Asset    @relation("ComparisonBefore", fields: [beforeAssetId], references: [id])
+  beforeAsset   Asset    @relation("ComparisonBefore", fields: [beforeAssetId], references: [id], onDelete: Cascade)
   afterAssetId  String
-  afterAsset    Asset    @relation("ComparisonAfter", fields: [afterAssetId], references: [id])
+  afterAsset    Asset    @relation("ComparisonAfter", fields: [afterAssetId], references: [id], onDelete: Cascade)
   resultAssetId String
-  resultAsset   Asset    @relation("ComparisonResult", fields: [resultAssetId], references: [id])
+  resultAsset   Asset    @relation("ComparisonResult", fields: [resultAssetId], references: [id], onDelete: Cascade)
   beforeLabel   String   @default("PRED")
   afterLabel    String   @default("PO")
   createdAt     DateTime @default(now())
