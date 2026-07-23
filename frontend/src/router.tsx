@@ -2,6 +2,7 @@ import { Route, Routes } from 'react-router-dom';
 import { ProjectListPage } from './pages/ProjectListPage';
 import { ProjectDetailPage } from './pages/ProjectDetailPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { DescriptionPage } from './pages/DescriptionPage';
 
 export function AppRoutes() {
   return (
@@ -9,6 +10,7 @@ export function AppRoutes() {
       <Route path="/" element={<ProjectListPage />} />
       <Route path="/projects/:id" element={<ProjectDetailPage />} />
       <Route path="/nastavenia" element={<SettingsPage />} />
+      <Route path="/popis" element={<DescriptionPage />} />
     </Routes>
   );
 }

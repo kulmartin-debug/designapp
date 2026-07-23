@@ -60,6 +60,12 @@ function App() {
             >
               NASTAVENIA
             </Link>
+            <Link
+              to="/popis"
+              className="text-xs font-medium tracking-[0.2em] text-ink-soft transition-colors hover:text-brand-600"
+            >
+              POPIS
+            </Link>
             {authRequired && (
               <button
                 type="button"
