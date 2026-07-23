@@ -7,7 +7,9 @@ services:
     name: designapp
     runtime: node
     plan: free
-    buildCommand: npm run build
+    # Render does not run `npm install` automatically before a custom
+    # buildCommand - it has to be included explicitly.
+    buildCommand: npm install && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_ENV
