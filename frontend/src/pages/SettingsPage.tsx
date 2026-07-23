@@ -31,6 +31,19 @@ export function SettingsPage() {
           <ProviderCredentialRow key={summary.provider} summary={summary} onChanged={handleChanged} />
         ))}
       </div>
+
+      <div className="space-y-2 rounded-md border border-brand-100 bg-brand-50 px-4 py-3 text-sm text-brand-700">
+        <p>
+          <strong>Odhadované náklady nie sú presné.</strong> Suma pri každom projekte je len orientačný odhad podľa
+          pevného cenníka nastaveného priamo v kóde appky — nejde o reálne, priebežne aktualizované fakturačné dáta
+          od Replicate/fal.ai/Gemini, takže sa časom môže od skutočných nákladov líšiť.
+        </p>
+        <p>
+          <strong>Ako to nastaviť správne:</strong> upravte súbor <code>backend/src/config/providerPricing.ts</code> —
+          tam je cena za jeden vygenerovaný obrázok pre každého providera a modul (Modul B / Modul C). Aktuálne ceny
+          nájdete na cenníkových stránkach: replicate.com/pricing, fal.ai/pricing, ai.google.dev/gemini-api/docs/pricing.
+        </p>
+      </div>
     </div>
   );
 }
